@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Zap, Menu, X, ChevronRight } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Zap, Menu, X, ChevronRight, LayoutDashboard, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { logoutUserAction } from "@/actions/auth.action";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -14,8 +15,10 @@ const navLinks = [
   { label: "Coverage", href: "/coverage" },
 ];
 
-export default function Navbar() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default function Navbar({ session }: { session: any }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -30,7 +33,6 @@ export default function Navbar() {
 
     window.addEventListener("scroll", handleScroll);
     window.addEventListener("resize", handleResize);
-
     handleScroll();
 
     return () => {
@@ -38,6 +40,14 @@ export default function Navbar() {
       window.removeEventListener("resize", handleResize);
     };
   }, []);
+
+  const handleLogout = async () => {
+    const res = await logoutUserAction();
+    if (res.success) {
+      router.push("/sign-in");
+      router.refresh();
+    }
+  };
 
   return (
     <>
@@ -50,6 +60,7 @@ export default function Navbar() {
         )}
       >
         <div className="max-w-7xl mx-auto px-5 sm:px-8 flex items-center justify-between">
+          {/* Logo Section */}
           <Link href="/" className="flex items-center gap-3 group relative z-[110]">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#00F5A0] to-[#00D9F5] shadow-lg shadow-[#00F5A0]/20 group-hover:rotate-[10deg] transition-all duration-300">
               <Zap size={24} className="text-[#06060b] fill-current" />
@@ -59,6 +70,7 @@ export default function Navbar() {
             </span>
           </Link>
 
+          {/* Desktop Navigation Links */}
           <div className="hidden lg:flex items-center gap-10 text-[15px] font-bold">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -79,28 +91,51 @@ export default function Navbar() {
             })}
           </div>
 
+          {/* Right Side Actions (Conditional Rendering) */}
           <div className="hidden md:flex items-center gap-5">
-            <Link href="/sign-in">
-              <span className={cn(
-                "font-bold cursor-pointer transition-colors text-sm",
-                pathname === "/sign-in" ? "text-[#00F5A0]" : "text-white hover:text-[#00F5A0]"
-              )}>
-                Sign In
-              </span>
-            </Link>
-            <Link href="/sign-up">
-              <Button className="bg-gradient-to-r from-[#00F5A0] to-[#00D9F5] text-[#06060b] font-black rounded-xl hover:scale-105 transition-all shadow-xl shadow-[#00F5A0]/10 px-7 h-11">
-                Sign Up
-              </Button>
-            </Link>
+            {session ? (
+              /* ✅ লগইন থাকলে এই পার্টটা রেন্ডার হবে */
+              <div className="flex items-center gap-4">
+                <Link href="/dashboard">
+                  <span className="font-bold text-white hover:text-[#00F5A0] transition-colors text-sm flex items-center gap-2 cursor-pointer">
+                    <LayoutDashboard size={18} /> Dashboard
+                  </span>
+                </Link>
+                <Button 
+                  onClick={handleLogout}
+                  className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 font-black rounded-xl transition-all px-7 h-11"
+                >
+                  <LogOut size={18} className="mr-2" /> Logout
+                </Button>
+              </div>
+            ) : (
+              /* ❌ লগইন না থাকলে এই পার্টটা রেন্ডার হবে */
+              <>
+                <Link href="/sign-in">
+                  <span className={cn(
+                    "font-bold cursor-pointer transition-colors text-sm",
+                    pathname === "/sign-in" ? "text-[#00F5A0]" : "text-white hover:text-[#00F5A0]"
+                  )}>
+                    Sign In
+                  </span>
+                </Link>
+                <Link href="/sign-up">
+                  <Button className="bg-gradient-to-r from-[#00F5A0] to-[#00D9F5] text-[#06060b] font-black rounded-xl hover:scale-105 transition-all shadow-xl shadow-[#00F5A0]/10 px-7 h-11">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
+          {/* Mobile Menu Toggle */}
           <button className="lg:hidden relative z-[110] p-2.5 rounded-xl bg-white/5 border border-white/10 text-white active:scale-90" onClick={() => setMobileOpen(!mobileOpen)}>
             {mobileOpen ? <X size={26} /> : <Menu size={26} />}
           </button>
         </div>
       </nav>
 
+      {/* Mobile Sidebar Navigation */}
       <div className={cn("fixed inset-0 z-[90] bg-[#06060b] transition-all duration-500 lg:hidden", mobileOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-full pointer-events-none")}>
         <div className="absolute top-[-10%] right-[-10%] w-[300px] h-[300px] bg-[#00F5A0]/10 blur-[100px] rounded-full" />
         <div className="flex flex-col h-full pt-32 px-8 pb-10">
@@ -124,13 +159,31 @@ export default function Navbar() {
               );
             })}
           </div>
+
+          {/* Mobile Bottom Buttons */}
           <div className="mt-auto flex flex-col gap-4">
-            <Link href="/sign-in" onClick={() => setMobileOpen(false)}>
-              <Button variant="outline" className="w-full h-16 font-bold border-white/10 text-white rounded-2xl text-lg bg-white/5">Sign In</Button>
-            </Link>
-            <Link href="/sign-up" onClick={() => setMobileOpen(false)}>
-              <Button className="w-full h-16 bg-gradient-to-r from-[#00F5A0] to-[#00D9F5] text-[#06060b] font-black rounded-2xl shadow-2xl text-lg">Sign Up</Button>
-            </Link>
+            {session ? (
+              <>
+                <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" className="w-full h-16 font-bold border-white/10 text-white rounded-2xl text-lg bg-white/5">Dashboard</Button>
+                </Link>
+                <Button 
+                  onClick={handleLogout}
+                  className="w-full h-16 bg-red-500 text-white font-black rounded-2xl text-lg shadow-xl"
+                >
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/sign-in" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" className="w-full h-16 font-bold border-white/10 text-white rounded-2xl text-lg bg-white/5">Sign In</Button>
+                </Link>
+                <Link href="/sign-up" onClick={() => setMobileOpen(false)}>
+                  <Button className="w-full h-16 bg-gradient-to-r from-[#00F5A0] to-[#00D9F5] text-[#06060b] font-black rounded-2xl shadow-2xl text-lg">Sign Up</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

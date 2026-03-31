@@ -1,5 +1,6 @@
 import { Outfit } from "next/font/google"; 
 import "./globals.css";
+import { Toaster } from "sonner";
 
 const outfit = Outfit({ 
   subsets: ["latin"],
@@ -16,6 +17,11 @@ export default function RootLayout({
     <html lang="en" className={outfit.variable} suppressHydrationWarning>
       <body  className={`${outfit.className} antialiased`} suppressHydrationWarning>
         {children}
+           <Toaster
+          position="top-center"
+          richColors
+          theme="dark"
+        />
       </body>
     </html>
   );
