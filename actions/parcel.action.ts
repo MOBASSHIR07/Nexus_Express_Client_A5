@@ -91,6 +91,14 @@ export const createPaymentSessionAction = async (parcelId: string) => {
   }
 };
 
+export const getPaymentHistoryAction = async () => {
+  try {
+    const res = await parcelService.getPaymentHistory();
+    return res;
+  } catch (error) {
+    return { success: false, message: "Failed to load payment history.", data: [] };
+  }
+};
 
 export const trackParcelAction = async (trackingCode: string) => {
   try {

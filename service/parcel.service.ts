@@ -98,15 +98,18 @@ export const parcelService = {
   },
 
   trackParcel: async (trackingCode: string) => {
-   
     const cookieStore = await cookies();
     const token = cookieStore.get("auth_session")?.value;
+    const encodedCode = encodeURIComponent(trackingCode.trim());
 
-    const res = await fetch(`${env.BACKEND_URL}/api/parcel/track/${trackingCode}`, {
-      headers: {
-        Cookie: `__Secure-better-auth.session_token=${token}`,
-      },
-      next: { revalidate: 0 }
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Cookie = `__Secure-better-auth.session_token=${token}`;
+    }
+
+    const res = await fetch(`${env.BACKEND_URL}/api/parcel/track/${encodedCode}`, {
+      headers,
+      next: { revalidate: 0 },
     });
     return res.json();
   },
@@ -116,11 +119,14 @@ export const parcelService = {
     const cookieStore = await cookies();
     const token = cookieStore.get("auth_session")?.value;
 
-    const res = await fetch(`${env.BACKEND_URL}/api/payment/my-history`, {
-      headers: {
-        Cookie: `__Secure-better-auth.session_token=${token}`,
-      },
-      next: { revalidate: 60 }
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Cookie = `__Secure-better-auth.session_token=${token}`;
+    }
+
+    const res = await fetch(`${env.BACKEND_URL}/api/pay/my-history`, {
+      headers,
+      next: { revalidate: 60 },
     });
     return res.json();
   }

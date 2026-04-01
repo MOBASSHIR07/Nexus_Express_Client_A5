@@ -98,7 +98,7 @@ export default async function MyParcelsPage({
                       {parcel.paymentStatus === "UNPAID" && (
                         <PayNowButton parcelId={parcel.id} price={parcel.price} />
                       )}
-                      <Link href={`/sender-dashboard/track/${parcel.trackingCode}`}>
+                      <Link href={`/track/${encodeURIComponent(parcel.trackingCode)}`}>
                         <Button variant="outline" className="h-12 border-white/5 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-2xl px-6 text-[10px] font-black uppercase">
                           <MapPin size={14} className="mr-2" /> Track
                         </Button>
