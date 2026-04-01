@@ -37,16 +37,91 @@ export const parcelService = {
     return res.json();
   },
 
-  getMyParcels: async () => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// getMyParcels: async (query: Record<string, any>) => {
+//     const cookieStore = await cookies();
+//     const token = cookieStore.get("auth_session")?.value;
+
+//     const params = new URLSearchParams(query);
+
+//     const res = await fetch(`${env.BACKEND_URL}/api/parcel/my-parcels?${params.toString()}`, {
+//       headers: {
+//         Cookie: `__Secure-better-auth.session_token=${token}`,
+//       },
+//       next: { revalidate: 0 }
+//     });
+//     return res.json();
+//   },
+
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getMyParcels: async (query: Record<string, any>) => {
     const cookieStore = await cookies();
     const token = cookieStore.get("auth_session")?.value;
+    const params = new URLSearchParams(query);
 
-    const res = await fetch(`${BACKEND_URL}/api/parcel/my-parcels`, {
+    const res = await fetch(`${env.BACKEND_URL}/api/parcel/my-parcels?${params.toString()}`, {
       headers: {
         Cookie: `__Secure-better-auth.session_token=${token}`,
       },
-      cache: "no-store",
+      next: { revalidate: 0 }
     });
     return res.json();
   },
+
+  createPaymentSession: async (parcelId: string) => {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth_session")?.value;
+    const payload = JSON.stringify({ parcelId });
+
+    const attemptPayment = async (url: string) => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `__Secure-better-auth.session_token=${token}`,
+        },
+        body: payload,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, data };
+    };
+
+    const primary = await attemptPayment(`${env.BACKEND_URL}/api/payment/create-checkout-session`);
+    if (primary.ok && primary.data?.success) {
+      return primary.data;
+    }
+
+    const fallback = await attemptPayment(`${env.BACKEND_URL}/api/pay/create-payment`);
+    return fallback.data || primary.data || { success: false, message: "Unable to initialize payment." };
+  },
+
+  trackParcel: async (trackingCode: string) => {
+   
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth_session")?.value;
+
+    const res = await fetch(`${env.BACKEND_URL}/api/parcel/track/${trackingCode}`, {
+      headers: {
+        Cookie: `__Secure-better-auth.session_token=${token}`,
+      },
+      next: { revalidate: 0 }
+    });
+    return res.json();
+  },
+
+ 
+  getPaymentHistory: async () => {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth_session")?.value;
+
+    const res = await fetch(`${env.BACKEND_URL}/api/payment/my-history`, {
+      headers: {
+        Cookie: `__Secure-better-auth.session_token=${token}`,
+      },
+      next: { revalidate: 60 }
+    });
+    return res.json();
+  }
 };
