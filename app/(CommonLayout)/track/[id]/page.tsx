@@ -154,7 +154,7 @@ export default async function TrackPage({ params }: PageProps) {
                     {/* Pricing */}
                     <div className="pt-4 border-t border-white/5 flex justify-between items-center">
                         <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Total cost</span>
-                        <span className="text-xl font-black text-[#00F5A0] italic tracking-tighter">৳{parcel.price}</span>
+                        <span className="text-xl font-black text-[#00F5A0] italic tracking-tighter">${parcel.price}</span>
                     </div>
                 </div>
             </div>
