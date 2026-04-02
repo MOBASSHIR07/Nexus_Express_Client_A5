@@ -34,6 +34,8 @@ export interface IParcel {
   weight: number;
   price: string | number;
   pickupAddress: string;
+  pickupDistrict: string;   
+  deliveryDistrict: string; 
   receiverName: string;
   receiverPhone: string;
   deliveryAddress: string;
@@ -43,6 +45,22 @@ export interface IParcel {
   updatedAt: string;
   
   tracking?: ITracking; 
+}
+
+export interface CreateParcelInput {
+  parcel: {
+    title: string;
+    category: "PARCEL" | "CARGO";
+    weight: number;
+    pickupAddress: string;
+    pickupDistrict: string;   
+    deliveryDistrict: string;
+  };
+  receiver: {
+    name: string;
+    phone: string;
+    address: string;
+  };
 }
 
 export interface IMeta {

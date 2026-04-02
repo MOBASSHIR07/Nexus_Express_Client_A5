@@ -16,3 +16,18 @@ export const approveRiderAction = async (riderId: string) => {
     return { success: false, message: "Nexus Network Error." };
   }
 };
+
+export const assignRiderAction = async (parcelId: string, riderId: string) => {
+  try {
+    const res = await adminService.assignRider(parcelId, riderId);
+    
+    if (res.success) {
+      revalidatePath("/admin-dashboard/all-parcels");
+      return { success: true, message: "Rider assigned and node updated!" };
+    }
+    
+    return { success: false, message: res.message || "Failed to assign rider." };
+  } catch (error) {
+    return { success: false, message: "Network error while assigning rider." };
+  }
+};

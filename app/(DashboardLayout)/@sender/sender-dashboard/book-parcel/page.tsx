@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -6,29 +7,24 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createParcelAction } from "@/actions/parcel.action";
 import { toast } from "sonner";
-import { Package, Truck, User, MapPin, Calculator, Loader2, ArrowRight, Globe } from "lucide-react";
+import { Package, Truck, User, MapPin, Calculator, Loader2, ArrowRight, Globe, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import coverageData from "@/data/coverage.json";
 
-// 📝 Form Validation Schema
 const bookParcelSchema = z.object({
-  title: z.string().min(3, "Title too short"),
+  title: z.string().min(3, "Title must be at least 3 characters"),
   category: z.enum(["PARCEL", "CARGO"]),
-  weight: z.number().positive("Min 1KG required"),
-  
-  // Sender Location
-  senderRegion: z.string().min(1, "Required"),
-  senderDistrict: z.string().min(1, "Required"),
-  senderArea: z.string().min(1, "Required"),
-  senderAddress: z.string().min(5, "Detail pickup address required"),
-
-  // Receiver Location
+  weight: z.number().min(0.5, "Minimum weight 0.5 KG").max(50, "Maximum weight 50 KG"),
+  senderRegion: z.string().min(1, "Please select sender region"),
+  senderDistrict: z.string().min(1, "Please select sender district"),
+  senderArea: z.string().min(1, "Please select sender area"),
+  senderAddress: z.string().min(5, "Please enter detailed pickup address"),
   receiverName: z.string().min(2, "Receiver name required"),
-  receiverPhone: z.string().min(11, "Valid phone required"),
-  receiverRegion: z.string().min(1, "Required"),
-  receiverDistrict: z.string().min(1, "Required"),
-  receiverArea: z.string().min(1, "Required"),
-  receiverAddress: z.string().min(5, "Detail delivery address required"),
+  receiverPhone: z.string().min(11, "Valid phone number required (11 digits)").max(11, "Phone number must be 11 digits"),
+  receiverRegion: z.string().min(1, "Please select receiver region"),
+  receiverDistrict: z.string().min(1, "Please select receiver district"),
+  receiverArea: z.string().min(1, "Please select receiver area"),
+  receiverAddress: z.string().min(5, "Please enter detailed delivery address"),
 });
 
 type BookParcelValues = z.infer<typeof bookParcelSchema>;
@@ -36,13 +32,33 @@ type BookParcelValues = z.infer<typeof bookParcelSchema>;
 export default function BookParcelPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [price, setPrice] = useState(200);
+  const [error, setError] = useState<string | null>(null);
 
-  const { register, handleSubmit, watch, formState: { errors }, reset } = useForm<BookParcelValues>({
+  const { 
+    register, 
+    handleSubmit, 
+    watch, 
+    formState: { errors },
+    reset
+  } = useForm<BookParcelValues>({
     resolver: zodResolver(bookParcelSchema),
-    defaultValues: { category: "PARCEL", weight: 1 }
+    defaultValues: { 
+      category: "PARCEL", 
+      weight: 1,
+      title: "",
+      senderRegion: "",
+      senderDistrict: "",
+      senderArea: "",
+      senderAddress: "",
+      receiverName: "",
+      receiverPhone: "",
+      receiverRegion: "",
+      receiverDistrict: "",
+      receiverArea: "",
+      receiverAddress: ""
+    }
   });
 
-  // Watchers for Dynamic Dropdowns
   const weight = watch("weight");
   const category = watch("category");
   const sRegion = watch("senderRegion");
@@ -50,167 +66,329 @@ export default function BookParcelPage() {
   const rRegion = watch("receiverRegion");
   const rDistrict = watch("receiverDistrict");
 
-  // 🌍 Coverage Logic
   const regions = useMemo(() => [...new Set(coverageData.map(d => d.region))], []);
-  
   const sDistricts = useMemo(() => coverageData.filter(d => d.region === sRegion).map(d => d.district), [sRegion]);
   const sAreas = useMemo(() => coverageData.find(d => d.district === sDistrict)?.covered_area || [], [sDistrict]);
-
   const rDistricts = useMemo(() => coverageData.filter(d => d.region === rRegion).map(d => d.district), [rRegion]);
   const rAreas = useMemo(() => coverageData.find(d => d.district === rDistrict)?.covered_area || [], [rDistrict]);
 
-  // 💰 Backend Pricing Logic Consistency
+  // Calculate price based on category and weight
   useEffect(() => {
-    if (category === "PARCEL") setPrice(200);
-    else if (category === "CARGO") setPrice(weight * 100);
+    if (category === "PARCEL") {
+      setPrice(200);
+    } else if (category === "CARGO") {
+      const basePrice = 100;
+      const calculatedPrice = weight * basePrice;
+      setPrice(calculatedPrice);
+    }
   }, [weight, category]);
 
   const onSubmit = async (data: BookParcelValues) => {
+    // Clear previous error
+    setError(null);
     setIsSubmitting(true);
     
-    // 🛠️ Formatting Data for Backend (Nested Structure)
-    const finalPayload = {
-      parcel: {
-        title: data.title,
-        category: data.category,
-        weight: data.weight,
-        pickupAddress: `${data.senderArea}, ${data.senderDistrict}, ${data.senderRegion}. (${data.senderAddress})`,
-      },
-      receiver: {
-        name: data.receiverName,
-        phone: data.receiverPhone,
-        address: `${data.receiverArea}, ${data.receiverDistrict}, ${data.receiverRegion}. (${data.receiverAddress})`,
-      },
-      price: price
-    };
+    // Show loading toast
+    const loadingToast = toast.loading("Processing your shipment request...");
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await createParcelAction(finalPayload as any);
+      // Prepare the payload according to your API expected format
+      const finalPayload = {
+        parcel: {
+          title: data.title,
+          category: data.category,
+          weight: Number(data.weight),
+          pickupAddress: `${data.senderArea}, ${data.senderDistrict}, ${data.senderRegion}. ${data.senderAddress}`,
+          pickupDistrict: data.senderDistrict,
+          deliveryDistrict: data.receiverDistrict,
+        },
+        receiver: {
+          name: data.receiverName,
+          phone: data.receiverPhone,
+          address: `${data.receiverArea}, ${data.receiverDistrict}, ${data.receiverRegion}. ${data.receiverAddress}`,
+        },
+      };
 
-      if (result.success) {
-        toast.success(result.message || "Shipment Initialized!", {
-          description: "Moving to Secure Stripe Gateway...",
+      console.log("Sending payload:", finalPayload);
+      
+      const result = await createParcelAction(finalPayload as any);
+      
+      console.log("API Response:", result);
+
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
+      if (result?.success && result?.data?.paymentUrl) {
+        toast.success("Shipment created! Redirecting to payment...", {
           duration: 3000,
         });
-
-        // 💳 Redirect to Stripe Session
+        
+        // Small delay before redirect for better UX
         setTimeout(() => {
-          if (result.data?.paymentUrl) {
-            window.location.href = result.data.paymentUrl;
-          }
-        }, 2000);
+          window.location.href = result.data.paymentUrl;
+        }, 1500);
       } else {
-        toast.error(result.message || "Initialization Failed.");
+        // Handle different error scenarios
+        const errorMessage = result?.message || "Failed to create shipment. Please try again.";
+        toast.error(errorMessage);
+        setError(errorMessage);
         setIsSubmitting(false);
       }
-    } catch (error) {
-      toast.error("Neural Link Failure: Server not responding.");
+    } catch (error: any) {
+      console.error("Submission Error:", error);
+      toast.dismiss(loadingToast);
+      
+      const errorMessage = error?.message || "Network error! Please check your connection and try again.";
+      toast.error(errorMessage);
+      setError(errorMessage);
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 pb-20 animate-in fade-in duration-1000">
-      {/* Header Section */}
-      <div>
-        <h1 className="text-6xl font-black text-white italic tracking-tighter uppercase leading-none">
-          Neural <span className="text-[#00F5A0]">Dispatch.</span>
-        </h1>
-        <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.5em] mt-4 flex items-center gap-2">
-          <Globe size={12} className="text-[#00F5A0] animate-pulse" /> Intelligent Coverage Protocol v2.0
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black">
+      <div className="max-w-6xl mx-auto p-6 md:p-10 space-y-8">
         
-        {/* Left Section: Form Inputs */}
-        <div className="lg:col-span-8 space-y-8">
-          
-          {/* 1. Item Details */}
-          <section className="bg-white/5 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
-            <h3 className="text-[10px] font-black text-[#00F5A0] uppercase tracking-widest flex items-center gap-2">
-              <Package size={14} /> 01. Item Specifications
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <input {...register("title")} placeholder="Parcel Title (e.g. Desktop Monitor)" className="bg-[#0b0b11] border border-white/5 rounded-2xl px-5 h-14 outline-none focus:border-[#00F5A0] transition-all" />
-              <div className="grid grid-cols-2 gap-4">
-                <select {...register("category")} className="bg-[#0b0b11] border border-white/5 rounded-2xl px-4 h-14 outline-none">
-                  <option value="PARCEL">PARCEL</option>
-                  <option value="CARGO">CARGO</option>
-                </select>
-                <input type="number" {...register("weight", { valueAsNumber: true })} className="bg-[#0b0b11] border border-white/5 rounded-2xl px-5 h-14 outline-none" />
+        {/* Header Section */}
+        <div className="space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+            <Globe className="w-3 h-3 text-emerald-400" />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400">
+              Neural Dispatch Protocol v2.0
+            </span>
+          </div>
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
+            Neural <span className="bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent">Dispatch</span>
+          </h1>
+          <p className="text-sm text-gray-400 max-w-2xl">
+            Book a parcel delivery with intelligent coverage mapping. Real-time pricing and instant payment processing.
+          </p>
+        </div>
+
+        {/* Error Alert */}
+        {error && (
+          <div className="rounded-2xl bg-red-500/10 border border-red-500/20 p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-red-400">Booking Failed</p>
+              <p className="text-xs text-red-400/80">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Left Column - Form Fields */}
+          <div className="lg:col-span-8 space-y-6">
+            
+            {/* Item Specifications */}
+            <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 p-6 space-y-5">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider">01. Item Specifications</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <input 
+                    {...register("title")} 
+                    placeholder="Parcel Title (e.g., Documents, Electronics)"
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50 transition-all"
+                  />
+                  {errors.title && <p className="text-xs text-red-400 mt-1">{errors.title.message}</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <select 
+                      {...register("category")} 
+                      className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50"
+                    >
+                      <option value="PARCEL">📦 PARCEL</option>
+                      <option value="CARGO">🚚 CARGO</option>
+                    </select>
+                  </div>
+                  <div>
+                    <input 
+                      type="number" 
+                      step="0.5"
+                      {...register("weight", { valueAsNumber: true })} 
+                      placeholder="Weight (KG)"
+                      className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50"
+                    />
+                    {errors.weight && <p className="text-xs text-red-400 mt-1">{errors.weight.message}</p>}
+                  </div>
+                </div>
               </div>
             </div>
-          </section>
 
-          {/* 2. Sender Logistics */}
-          <section className="bg-white/5 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
-            <h3 className="text-[10px] font-black text-white/40 uppercase tracking-widest flex items-center gap-2">
-              <MapPin size={14} /> 02. Origin Configuration
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <select {...register("senderRegion")} className="bg-[#0b0b11] border border-white/5 rounded-xl px-4 h-12 outline-none">
-                <option value="">Region</option>
-                {regions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-              <select {...register("senderDistrict")} disabled={!sRegion} className="bg-[#0b0b11] border border-white/5 rounded-xl px-4 h-12 outline-none disabled:opacity-20">
-                <option value="">District</option>
-                {sDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <select {...register("senderArea")} disabled={!sDistrict} className="bg-[#0b0b11] border border-white/5 rounded-xl px-4 h-12 outline-none disabled:opacity-20">
-                <option value="">Area</option>
-                {sAreas.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            <textarea {...register("senderAddress")} placeholder="Detail Pickup Address (House, Road, Apartment...)" rows={2} className="w-full bg-[#0b0b11] border border-white/5 rounded-2xl p-5 outline-none resize-none focus:border-white/20" />
-          </section>
-
-          {/* 3. Receiver Registry */}
-          <section className="bg-white/5 border border-white/5 p-8 rounded-[2.5rem] space-y-6">
-            <h3 className="text-[10px] font-black text-[#00D9F5] uppercase tracking-widest flex items-center gap-2">
-              <User size={14} /> 03. Target Registry
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <input {...register("receiverName")} placeholder="Receiver Full Name" className="bg-[#0b0b11] border border-white/5 rounded-2xl px-5 h-14 outline-none focus:border-[#00D9F5]" />
-              <input {...register("receiverPhone")} placeholder="Receiver Phone Number" className="bg-[#0b0b11] border border-white/5 rounded-2xl px-5 h-14 outline-none focus:border-[#00D9F5]" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <select {...register("receiverRegion")} className="bg-[#0b0b11] border border-white/5 rounded-xl px-4 h-12 outline-none">
-                <option value="">Region</option>
-                {regions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-              <select {...register("receiverDistrict")} disabled={!rRegion} className="bg-[#0b0b11] border border-white/5 rounded-xl px-4 h-12 outline-none disabled:opacity-20">
-                <option value="">District</option>
-                {rDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <select {...register("receiverArea")} disabled={!rDistrict} className="bg-[#0b0b11] border border-white/5 rounded-xl px-4 h-12 outline-none disabled:opacity-20">
-                <option value="">Area</option>
-                {rAreas.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            <textarea {...register("receiverAddress")} placeholder="Full Delivery Address Details..." rows={2} className="w-full bg-[#0b0b11] border border-white/5 rounded-2xl p-5 outline-none resize-none focus:border-white/20" />
-          </section>
-        </div>
-
-        {/* Right Section: Summary & Checkout */}
-        <div className="lg:col-span-4">
-          <div className="bg-gradient-to-br from-[#00F5A0]/10 to-[#00D9F5]/10 border border-[#00F5A0]/20 p-8 rounded-[3rem] sticky top-8 text-center backdrop-blur-sm">
-            <Calculator className="text-[#00F5A0] mx-auto mb-4" size={32} />
-            <p className="text-[9px] font-black text-white/20 uppercase tracking-widest">Neural Valuation</p>
-            <h4 className="text-6xl font-black text-white italic mb-10 tracking-tighter">৳{price}</h4>
-            
-            <div className="space-y-4 mb-10 text-[10px] font-bold uppercase tracking-widest text-white/30 text-left border-t border-white/5 pt-6">
-               <div className="flex justify-between"><span>Method</span><span className="text-white">STRIPE CARD</span></div>
-               <div className="flex justify-between"><span>Payload</span><span className="text-white">{weight} KG / {category}</span></div>
+            {/* Origin Configuration */}
+            <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 p-6 space-y-5">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider">02. Pickup Location</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <select 
+                    {...register("senderRegion")} 
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50"
+                  >
+                    <option value="">Select Region</option>
+                    {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  {errors.senderRegion && <p className="text-xs text-red-400 mt-1">{errors.senderRegion.message}</p>}
+                </div>
+                <div>
+                  <select 
+                    {...register("senderDistrict")} 
+                    disabled={!sRegion}
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none disabled:opacity-50"
+                  >
+                    <option value="">Select District</option>
+                    {sDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  {errors.senderDistrict && <p className="text-xs text-red-400 mt-1">{errors.senderDistrict.message}</p>}
+                </div>
+                <div>
+                  <select 
+                    {...register("senderArea")} 
+                    disabled={!sDistrict}
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none disabled:opacity-50"
+                  >
+                    <option value="">Select Area</option>
+                    {sAreas.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                  {errors.senderArea && <p className="text-xs text-red-400 mt-1">{errors.senderArea.message}</p>}
+                </div>
+              </div>
+              <div>
+                <textarea 
+                  {...register("senderAddress")} 
+                  placeholder="Detailed pickup address (building, floor, road, etc.)"
+                  rows={2}
+                  className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50 resize-none"
+                />
+                {errors.senderAddress && <p className="text-xs text-red-400 mt-1">{errors.senderAddress.message}</p>}
+              </div>
             </div>
 
-            <Button disabled={isSubmitting} type="submit" className="w-full h-20 bg-[#00F5A0] hover:bg-[#00D9F5] text-[#06060b] font-black rounded-[2rem] text-xl transition-all shadow-[0_20px_40px_rgba(0,245,160,0.2)] active:scale-95 flex items-center justify-center gap-3">
-              {isSubmitting ? <Loader2 className="animate-spin" size={24} /> : <>INITIATE CHECKOUT <ArrowRight size={24} /></>}
-            </Button>
+            {/* Target Registry */}
+            <div className="rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 p-6 space-y-5">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-xs font-semibold text-white uppercase tracking-wider">03. Delivery Information</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <input 
+                    {...register("receiverName")} 
+                    placeholder="Receiver Full Name"
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50"
+                  />
+                  {errors.receiverName && <p className="text-xs text-red-400 mt-1">{errors.receiverName.message}</p>}
+                </div>
+                <div>
+                  <input 
+                    {...register("receiverPhone")} 
+                    placeholder="Receiver Phone Number"
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50"
+                  />
+                  {errors.receiverPhone && <p className="text-xs text-red-400 mt-1">{errors.receiverPhone.message}</p>}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <select 
+                    {...register("receiverRegion")} 
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50"
+                  >
+                    <option value="">Select Region</option>
+                    {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  {errors.receiverRegion && <p className="text-xs text-red-400 mt-1">{errors.receiverRegion.message}</p>}
+                </div>
+                <div>
+                  <select 
+                    {...register("receiverDistrict")} 
+                    disabled={!rRegion}
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none disabled:opacity-50"
+                  >
+                    <option value="">Select District</option>
+                    {rDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  {errors.receiverDistrict && <p className="text-xs text-red-400 mt-1">{errors.receiverDistrict.message}</p>}
+                </div>
+                <div>
+                  <select 
+                    {...register("receiverArea")} 
+                    disabled={!rDistrict}
+                    className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none disabled:opacity-50"
+                  >
+                    <option value="">Select Area</option>
+                    {rAreas.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                  {errors.receiverArea && <p className="text-xs text-red-400 mt-1">{errors.receiverArea.message}</p>}
+                </div>
+              </div>
+              <div>
+                <textarea 
+                  {...register("receiverAddress")} 
+                  placeholder="Detailed delivery address (building, floor, road, etc.)"
+                  rows={2}
+                  className="w-full bg-gray-900/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-emerald-500/50 resize-none"
+                />
+                {errors.receiverAddress && <p className="text-xs text-red-400 mt-1">{errors.receiverAddress.message}</p>}
+              </div>
+            </div>
           </div>
-        </div>
-      </form>
+
+          {/* Right Column - Price & Checkout */}
+          <div className="lg:col-span-4">
+            <div className="sticky top-8 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 backdrop-blur-sm border border-emerald-500/20 p-6 space-y-6">
+              <div className="text-center">
+                <Calculator className="w-8 h-8 text-emerald-400 mx-auto mb-3" />
+                <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">Estimated Cost</p>
+                <h2 className="text-5xl font-bold text-white mt-2">৳{price}</h2>
+              </div>
+
+              <div className="space-y-3 pt-4 border-t border-white/10">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Service Type</span>
+                  <span className="text-white font-semibold">{category}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Weight</span>
+                  <span className="text-white font-semibold">{weight} KG</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Payment Method</span>
+                  <span className="text-emerald-400 font-semibold">Stripe / Card</span>
+                </div>
+              </div>
+
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="w-full h-12 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="animate-spin mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Proceed to Payment
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </>
+                )}
+              </Button>
+
+              <p className="text-[10px] text-center text-gray-500">
+                Secure payment powered by Stripe
+              </p>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
