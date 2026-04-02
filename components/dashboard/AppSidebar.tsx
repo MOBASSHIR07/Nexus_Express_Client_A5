@@ -20,7 +20,8 @@ export function AppSidebar({ role }: { role: string }) {
 
   const menuItems = {
     ADMIN: [
-      { title: "User Directory", url: "/admin-dashboard/users", icon: Users },
+      { title: "User Dictionary", url: "/admin-dashboard/all-users", icon: Users },
+      { title: "Dashboaed", url: "/admin-dashboard", icon: Users },
       { title: "All Parcels", url: "/admin-dashboard/all-parcels", icon: Package },
       { title: "Rider Approvals", url: "/admin-dashboard/rider-applications", icon: Truck },
       { title: "Withdrawals", url: "/admin-dashboard/withdraw-requests", icon: DollarSign },
