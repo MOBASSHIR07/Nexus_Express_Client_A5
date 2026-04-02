@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getRiderDashboardAction } from "@/actions/rider.action";
+export const dynamic = "force-dynamic";
 import { 
   DollarSign, 
   TrendingUp, 

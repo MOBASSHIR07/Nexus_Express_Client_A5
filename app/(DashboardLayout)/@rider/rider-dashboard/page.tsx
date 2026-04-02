@@ -1,4 +1,5 @@
 ﻿/* eslint-disable @typescript-eslint/no-explicit-any */
+export const dynamic = "force-dynamic";
 import { getRiderDashboardAction } from "@/actions/rider.action";
 import Link from "next/link";
 import { 
